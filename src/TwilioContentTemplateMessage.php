@@ -37,8 +37,7 @@ class TwilioContentTemplateMessage extends TwilioSmsMessage
      */
     public function contentVariables(array $contentVariables): self
     {
-        $this->contentVariables = json_encode($contentVariables);
-
+        $this->contentVariables = json_encode($contentVariables, JSON_FORCE_OBJECT);
         return $this;
     }
 }

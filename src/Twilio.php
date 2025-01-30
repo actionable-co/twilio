@@ -23,7 +23,19 @@ class Twilio
      */
     public function sendMessage(TwilioMessage $message, ?string $to, bool $useAlphanumericSender = false): CallInstance|MessageInstance
     {
+        if ($message instanceof TwilioContentTemplateMessage) {
+            return $this->sendContentTemplateMessage($message, $to);
+        }
+
         if ($message instanceof TwilioSmsMessage) {
+            if ($useAlphanumericSender && $sender = $this->getAlphanumericSender()) {
+                $message->from($sender);
+            }
+
+            return $this->sendSmsMessage($message, $to);
+        }
+
+        if ($message instanceof TwilioCallMessage) {
             if ($useAlphanumericSender && $sender = $this->getAlphanumericSender()) {
                 $message->from($sender);
             }
@@ -94,6 +106,49 @@ class Twilio
                 'contentSid',
                 'contentVariables',
             ]);
+        }
+
+        return $this->twilioService->messages->create($to, $params);
+    }
+
+    protected function sendContentTemplateMessage(TwilioContentTemplateMessage $message, ?string $to): MessageInstance
+    {
+        $debugTo = $this->config->getDebugTo();
+
+        if (! empty($debugTo)) {
+            $to = $debugTo;
+        }
+
+        $params = [
+            'to' => $to,
+        ];
+
+        if ($messagingServiceSid = $this->getMessagingServiceSid($message)) {
+            $params['messagingServiceSid'] = $messagingServiceSid;
+        }
+
+        if ($this->config->isShortenUrlsEnabled()) {
+            $params['ShortenUrls'] = 'true';
+        }
+
+        if ($from = $this->getFrom($message)) {
+            $params['from'] = $from;
+        }
+
+        $this->fillOptionalParams($params, $message, [
+            'statusCallback',
+            'statusCallbackMethod',
+            'applicationSid',
+            'forceDelivery',
+            'maxPrice',
+            'provideFeedback',
+            'validityPeriod',
+            'contentSid',
+            'contentVariables',
+        ]);
+
+        if (empty($from) && empty($messagingServiceSid)) {
+            throw CouldNotSendNotification::missingFrom();
         }
 
         return $this->twilioService->messages->create($to, $params);
